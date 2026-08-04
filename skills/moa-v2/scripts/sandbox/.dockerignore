@@ -1,0 +1,10 @@
+.git
+.moa-v2
+node_modules
+__pycache__
+.venv
+venv
+.pytest_cache
+*.pyc
+Dockerfile
+.dockerignore
