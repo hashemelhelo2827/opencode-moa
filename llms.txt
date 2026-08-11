@@ -1,0 +1,51 @@
+# opencode-moa
+
+> Evidence-based build pipeline for opencode that orchestrates 10 AI sub-agents to build complete deliverables and proves correctness through a deterministic 5-gate review pipeline (semantic, static, runtime, adversarial, verdict).
+
+## Documentation
+
+- [Main README](README.md): Full pipeline overview, team, five-gate review, install, and usage
+- [AGENTS.md](AGENTS.md): Agent-oriented invariants, layout, verification, and code style
+- [Operational Memory](skills/moa-v2/MOA_V2_MEMORY.md): Budget counters, catalogs, workflow authority
+- [Lessons](skills/moa-v2/LESSONS.md): Append-only operational lessons
+- [Staged Instructions](skills/moa-v2/STEP_B.md): Stage B orchestration instructions
+
+## Agent Definitions
+
+- [Orchestrator (agents/moa-v2.md)](agents/moa-v2.md): moa-v2 orchestrator agent
+- [DeepSeek (agents/moa-deepseek.md)](agents/moa-deepseek.md): Reasoning, plan synthesis, implementation
+- [Nemotron (agents/moa-nemotron.md)](agents/moa-nemotron.md): Analysis, edge cases, optimization
+- [North (agents/moa-north.md)](agents/moa-north.md): Code structure analysis & review
+- [Mimo (agents/moa-mimo.md)](agents/moa-mimo.md): Programming & implementation
+- [Big Pickle (agents/moa-bigpickle.md)](agents/moa-bigpickle.md): Creative direction & brainstorming
+- [Gemini Plan Author (agents/moa-gemini35.md)](agents/moa-gemini35.md): Frontend/UI/UX plan (primary)
+- [Mistral Reviewer Lo (agents/moa-mistral-reviewer.md)](agents/moa-mistral-reviewer.md): Gate A + E1 + structure passes
+- [Mistral Reviewer Hi (agents/moa-mistral-reviewer-hi.md)](agents/moa-mistral-reviewer-hi.md): Gate B module/security passes
+- [Runtime Verifier (agents/moa-runtime-verifier.md)](agents/moa-runtime-verifier.md): Gate C Docker runtime execution
+
+## Pipeline Skills
+
+- [Grill-me (skills/moa-v2/grill-me/SKILL.md)](skills/moa-v2/grill-me/SKILL.md): Step 0 - design-tree interview
+- [Prompt Optimizer (skills/moa-v2/prompt-optimizer/SKILL.md)](skills/moa-v2/prompt-optimizer/SKILL.md): Step 1 - brief + task_type tags
+- [Decompose Plan (skills/moa-v2/decompose-plan/SKILL.md)](skills/moa-v2/decompose-plan/SKILL.md): Step 2 - tasks + measurable criteria
+- [Skill Finder Stacker (skills/moa-v2/skill-finder-stacker/SKILL.md)](skills/moa-v2/skill-finder-stacker/SKILL.md): Step 3 - skill discovery + vetting
+- [Test Script Maker (skills/moa-v2/test-script-maker/SKILL.md)](skills/moa-v2/test-script-maker/SKILL.md): Step 6 - test matrix + scripts
+
+## Root-of-Trust Scripts
+
+- [Verdict Engine (skills/moa-v2/scripts/verdict_engine.py)](skills/moa-v2/scripts/verdict_engine.py): Authoritative verdict (no LLM)
+- [Complexity Classifier (skills/moa-v2/scripts/classify_complexity.py)](skills/moa-v2/scripts/classify_complexity.py): Complexity scaling + policy requirement sets
+- [Flow Validator (skills/moa-v2/scripts/validate_flow.py)](skills/moa-v2/scripts/validate_flow.py): Browser-run gate - schema REJECT / policy normalize
+- [Review Package Builder (skills/moa-v2/scripts/build_review_package.py)](skills/moa-v2/scripts/build_review_package.py): Typed review package builder
+- [Mutation Tester (skills/moa-v2/scripts/mutate_workspace.py)](skills/moa-v2/scripts/mutate_workspace.py): Copy-on-write mutation tests
+- [Reviewer Benchmark (skills/moa-v2/scripts/benchmark_reviewer.py)](skills/moa-v2/scripts/benchmark_reviewer.py): Fallback-reviewer benchmark
+- [Flow Editor (skills/moa-v2/scripts/flow_menu.html)](skills/moa-v2/scripts/flow_menu.html): Flowchart editor (Mode 1)
+
+## Sandbox
+
+- [Sandbox Runner (skills/moa-v2/scripts/sandbox/sandbox_run.py)](skills/moa-v2/scripts/sandbox/sandbox_run.py): Gate C Docker sandbox execution
+- [Dockerfile](skills/moa-v2/scripts/sandbox/Dockerfile): Sandbox container definition
+
+## Configuration
+
+- [Config Example (config/opencode.jsonc.example)](config/opencode.jsonc.example): Trimmed provider + agent + Playwright MCP config
