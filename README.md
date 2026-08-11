@@ -1,5 +1,8 @@
 # opencode-moa — moa-v2
 
+[![CI](https://github.com/hashemelhelo2827/opencode-moa/actions/workflows/ci.yml/badge.svg)](https://github.com/hashemelhelo2827/opencode-moa/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 An **evidence-based build pipeline** for [opencode](https://opencode.ai). moa-v2 orchestrates 10 sub-agents to build complete deliverables (web / app / analysis) in the current working directory and proves correctness through a deterministic, 5-gate review pipeline.
 
 > **Core invariant:** no model opinion can issue PASS. PASS is the output of the Python verdict engine (`verdict_engine.py`) applied to typed evidence bound to a hashed revision.
