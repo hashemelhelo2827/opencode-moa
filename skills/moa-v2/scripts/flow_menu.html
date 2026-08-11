@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>moa-v2 Flow Menu</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#161a22; --panel2:#10131a; --line:#262c38;
+    --text:#e8ebf2; --dim:#8b93a3; --acc:#4f8cff; --warn:#ffb84d;
+    --bad:#ff6b6b; --ok:#4fd19b;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font:14px/1.45 "Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--text); overflow:hidden; }
+  #app { display:flex; flex-direction:column; height:100vh; }
+
+  header { display:flex; align-items:center; gap:12px; padding:8px 14px; border-bottom:1px solid var(--line); background:var(--panel); flex:0 0 auto; }
+  header .brand { font-weight:700; letter-spacing:.02em; }
+  header input[type=text] { background:var(--panel2); border:1px solid var(--line); color:var(--text); padding:5px 10px; border-radius:6px; width:220px; }
+  header .meta { color:var(--dim); font-size:11px; }
+  .btn { background:var(--panel2); border:1px solid var(--line); color:var(--text); padding:5px 11px; border-radius:6px; cursor:pointer; font-size:13px; }
+  .btn:hover { border-color:var(--acc); }
+  .btn.primary { background:var(--acc); border-color:var(--acc); color:#fff; }
+  .btn:disabled { opacity:.4; cursor:default; }
+  select { background:var(--panel2); border:1px solid var(--line); color:var(--text); padding:4px 6px; border-radius:6px; }
+
+  #main { flex:1 1 auto; display:flex; min-height:0; }
+  #sidebar { width:248px; flex:0 0 auto; background:var(--panel); border-right:1px solid var(--line); overflow-y:auto; padding:0; }
+  .tabs { display:flex; border-bottom:1px solid var(--line); }
+  .tab { flex:1; text-align:center; padding:9px 0; cursor:pointer; color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+  .tab.active { color:var(--acc); border-bottom:2px solid var(--acc); }
+  .tabpane { padding:10px; }
+  .tabpane.hidden { display:none; }
+  .pane-title { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:12px 0 6px; }
+  .chip { display:flex; align-items:center; gap:8px; padding:6px 8px; margin:4px 0; background:var(--panel2); border:1px solid var(--line); border-radius:8px; cursor:pointer; font-size:13px; }
+  .chip:hover { border-color:var(--acc); }
+  .chip .nid { color:var(--dim); font-size:11px; width:16px; }
+  .chip.off { opacity:.5; }
+  .chip .lock { margin-left:auto; color:var(--warn); font-size:12px; }
+  .check { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:13px; }
+  .check input { accent-color:var(--acc); }
+  .check .role { color:var(--dim); font-size:11px; }
+
+  #canvasWrap { flex:1 1 auto; position:relative; overflow:hidden; background:var(--bg); }
+  #layer { position:absolute; left:0; top:0; transform-origin:0 0; width:0; height:0; }
+  #edgeSvg { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; }
+  #nodes { position:absolute; left:0; top:0; }
+  .node { position:absolute; width:200px; height:64px; background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:6px 10px; cursor:grab; user-select:none; box-shadow:0 2px 8px rgba(0,0,0,.35); }
+  .node.selected { outline:2px solid var(--acc); }
+  .node.locked { border-left:4px solid var(--warn); }
+  .node.off { opacity:.42; border-style:dashed; }
+  .node .n-head { display:flex; align-items:center; gap:6px; }
+  .node .n-id { font-size:11px; color:var(--acc); font-weight:700; }
+  .node .n-name { font-weight:600; font-size:13px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .power { width:22px; height:22px; border-radius:50%; border:1px solid var(--line); background:transparent; color:var(--dim); cursor:pointer; font-size:13px; line-height:1; display:flex; align-items:center; justify-content:center; }
+  .power.on { background:var(--ok); border-color:var(--ok); color:#04120b; }
+  .power.off:hover { border-color:var(--ok); color:var(--ok); }
+  .power[disabled] { cursor:not-allowed; opacity:.55; }
+  .node .n-lose { font-size:10.5px; color:var(--dim); margin-top:3px; line-height:1.3; height:27px; overflow:hidden; }
+  .node .n-badge { position:absolute; top:-8px; right:-6px; font-size:9px; background:var(--warn); color:#1a1205; padding:1px 6px; border-radius:8px; font-weight:700; }
+  .edge-path { stroke:var(--acc); stroke-width:2; fill:none; stroke-dasharray:6 4; animation:dashflow 0.9s linear infinite; }
+  .edge-skip { stroke:var(--line); stroke-width:1.5; fill:none; stroke-dasharray:2 5; opacity:.5; }
+  @keyframes dashflow { to { stroke-dashoffset:-10; } }
+
+  #minimap { position:absolute; right:14px; bottom:14px; width:170px; height:110px; background:rgba(14,17,22,.88); border:1px solid var(--line); border-radius:8px; overflow:hidden; cursor:pointer; z-index:20; }
+  #minimap .mm-node { position:absolute; background:var(--acc); border-radius:2px; opacity:.8; }
+  #minimap .mm-node.off { background:var(--dim); opacity:.4; }
+  #minimap .mm-node.locked { background:var(--warn); }
+  #minimap .mm-vp { position:absolute; border:1px solid var(--text); background:rgba(255,255,255,.06); }
+
+  #zoomBar { position:absolute; left:14px; bottom:14px; display:flex; gap:4px; z-index:20; }
+  #zoomBar .btn { width:32px; height:30px; padding:0; text-align:center; font-weight:700; }
+
+  #inspector { width:272px; flex:0 0 auto; background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; padding:12px; }
+  #inspector .hint { color:var(--dim); font-size:13px; }
+  #inspector h3 { margin:0 0 8px; font-size:14px; }
+  .kv { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .kv .k { color:var(--dim); }
+  .pill { display:inline-block; font-size:10px; background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:1px 8px; margin:2px 3px 0 0; color:var(--dim); }
+  .pill.on { color:var(--ok); border-color:var(--ok); }
+  .insp-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+
+  #statusBar { flex:0 0 auto; background:var(--panel); border-top:1px solid var(--line); padding:6px 14px; display:flex; align-items:center; gap:12px; }
+  #lossChips { display:flex; flex-wrap:wrap; gap:6px; flex:1; }
+  .loss-chip { font-size:11px; padding:2px 9px; border-radius:10px; background:rgba(255,184,77,.12); border:1px solid rgba(255,184,77,.4); color:var(--warn); cursor:pointer; }
+  .loss-chip .x { color:var(--bad); }
+  #delegateNote { color:var(--dim); font-size:12px; white-space:nowrap; }
+
+  #exportPanel { flex:0 0 auto; border-top:1px solid var(--line); background:var(--panel); }
+  #exportToggle { display:flex; align-items:center; gap:10px; padding:6px 14px; cursor:pointer; color:var(--dim); font-size:12px; }
+  #exportToggle.active { color:var(--acc); }
+  #exportBody { display:none; grid-template-columns:1fr 1fr; gap:14px; padding:0 14px 12px; }
+  #exportBody.open { display:grid; }
+  textarea { width:100%; height:150px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px; font:11px/1.4 "Consolas",monospace; }
+  #toast { position:absolute; top:14px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--acc); color:var(--text); padding:8px 16px; border-radius:8px; opacity:0; transition:opacity .3s; z-index:50; pointer-events:none; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span class="brand">moa-v2 Flow Menu</span>
+    <input type="text" id="nameInput" placeholder="flow name">
+    <span class="meta" id="metaSpan"></span>
+    <span style="flex:1"></span>
+    <button class="btn" id="btnUndo" title="Undo (Ctrl+Z)">↶ Undo</button>
+    <button class="btn" id="btnRedo" title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
+    <select id="presetSelect" title="Load a preset configuration">
+      <option value="full">Preset: Full</option>
+      <option value="minimal">Preset: Minimal</option>
+      <option value="security">Preset: Security-hardened</option>
+    </select>
+    <button class="btn" id="btnReset">Reset</button>
+    <button class="btn primary" id="btnSave">Save</button>
+  </header>
+
+  <div id="main">
+    <aside id="sidebar">
+      <div class="tabs">
+        <div class="tab active" data-tab="steps">Steps</div>
+        <div class="tab" data-tab="config">Config</div>
+      </div>
+      <div id="pane-steps" class="tabpane">
+        <div class="pane-title">Pipeline (fixed 8-step set)</div>
+        <div id="stepList"></div>
+      </div>
+      <div id="pane-config" class="tabpane hidden">
+        <div class="pane-title">Delegate models</div>
+        <div id="modelChecks"></div>
+        <div class="pane-title">Synthesizer</div>
+        <select id="synthSelect" style="width:100%"></select>
+        <div class="check" style="margin-top:8px">
+          <input type="checkbox" id="frontendSynth">
+          <label for="frontendSynth">Frontend synthesis</label>
+        </div>
+        <div class="pane-title">Tests</div>
+        <div id="testChecks"></div>
+        <div class="pane-title">Tools</div>
+        <div id="toolChecks"></div>
+        <div class="pane-title">Gates (A–E)</div>
+        <div id="gateChecks"></div>
+      </div>
+    </aside>
+
+    <div id="canvasWrap">
+      <div id="layer">
+        <svg id="edgeSvg"></svg>
+        <div id="nodes"></div>
+      </div>
+      <div id="minimap"></div>
+      <div id="zoomBar">
+        <button class="btn" id="zIn" title="Zoom in">+</button>
+        <button class="btn" id="zOut" title="Zoom out">−</button>
+        <button class="btn" id="zOne" title="Zoom 100%">1:1</button>
+        <button class="btn" id="zFit" title="Fit to view">Fit</button>
+        <button class="btn" id="zLayout" title="Auto-layout">⇢</button>
+      </div>
+      <div id="toast"></div>
+    </div>
+
+    <aside id="inspector">
+      <div id="inspBody"><div class="hint">Select a step on the canvas to configure it.</div></div>
+    </aside>
+  </div>
+
+  <footer id="statusBar">
+    <span style="color:var(--dim);font-size:12px;white-space:nowrap">You lose if off:</span>
+    <div id="lossChips"></div>
+    <label style="color:var(--dim);font-size:12px">stack:</label>
+    <select id="stackSelect" title="Filter tests by stack">
+      <option value="all">all</option>
+      <option value="python">python</option>
+      <option value="node">node</option>
+      <option value="web">web</option>
+    </select>
+    <span id="delegateNote"></span>
+  </footer>
+
+  <footer id="exportPanel">
+    <div id="exportToggle">▸ Export (SVG · JSON)</div>
+    <div id="exportBody">
+      <div><label style="color:var(--dim);font-size:11px">SVG</label><textarea id="svgOut" readonly></textarea></div>
+      <div><label style="color:var(--dim);font-size:11px">JSON (flow)</label><textarea id="jsonOut" readonly></textarea></div>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var NODE_W = 200, NODE_H = 64, COL_GAP = 250, ROW_GAP = 120, MARGIN = 60;
+  var MIN_K = 0.2, MAX_K = 2.5, GRID = 8;
+
+  var STEP_DEFS = [
+    {id:0, name:"Grill-me", policy:"optional", lose:"hidden assumptions surface in Gate A"},
+    {id:1, name:"Optimize", policy:"required", lose:"no brief; Gate A cannot judge coverage"},
+    {id:2, name:"Plan", policy:"required", lose:"unmeasurable criteria; Gate A/B cannot verify"},
+    {id:3, name:"Skills", policy:"optional", lose:"missing vetted skills"},
+    {id:4, name:"Delegate", policy:"optional", lose:"no multi-model breadth"},
+    {id:5, name:"Synthesize", policy:"required", lose:"no plan/implement layer"},
+    {id:6, name:"Test", policy:"required", lose:"no Gate C evidence → INCOMPLETE_REVIEW"},
+    {id:7, name:"Review", policy:"required", lose:"no gates → no verdict"}
+  ];
+  var MODEL_IDS = ["deepseek", "nemotron", "north", "mimo", "bigpickle"];
+  var ROLES = {deepseek:"reasoning/synthesis", nemotron:"analysis/edge-cases", north:"structure/review", mimo:"implementation", bigpickle:"creative"};
+  var TESTS = [
+    {id:"pytest-functional", stack:"python", lose:"No Gate C core evidence → INCOMPLETE_REVIEW"},
+    {id:"bandit-security", stack:"python", lose:"No security signal (signal≠proof)"},
+    {id:"mutation", stack:"python", lose:"Gate D-light floor unmet"},
+    {id:"node:test-functional", stack:"node", lose:"No Gate C evidence"},
+    {id:"npm-audit", stack:"node", lose:"NOT_RUN_OFFLINE recorded (never fabricated)"},
+    {id:"dom-behavior", stack:"web", lose:"No behavioral coverage"},
+    {id:"owasp-checklist", stack:"web", lose:"No security signal"},
+    {id:"playwright-visual", stack:"web", lose:"Visual gate can't PASS"}
+  ];
+  var TOOL_DEFS = [
+    {id:"playwright", lose:"No visual gate; flowchart falls back to picker"},
+    {id:"docker", lose:"No Gate C runtime evidence"},
+    {id:"mistral", lose:"No Gates A/B/E1 → INCOMPLETE_REVIEW"}
+  ];
+  var GATE_DEFS = ["A", "B", "C", "D", "E"];
+  var SYNS = ["gemini35", "gemini3", "deepseek", "none"];
+
+  var state = makeDefaultState();
+  var camera = { k: 1, vx: 40, vy: 40 };
+  var selected = null;
+  var stackFilter = "all";
+  var history = [], redoStack = [];
+  var toastTimer = null;
+
+  function makeDefaultState() {
+    return {
+      schema_version: 1,
+      flow_version: 1,
+      name: "",
+      createdAt: "",
+      updatedAt: "",
+      project_revision_at_creation: "",
+      steps: STEP_DEFS.map(function (s) {
+        return { id: s.id, name: s.name, policy: s.policy, selected: true, lose: s.lose, pos: { x: 0, y: 0 } };
+      }),
+      delegateModels: { deepseek:true, nemotron:true, north:true, mimo:true, bigpickle:true },
+      roles: Object.assign({}, ROLES),
+      synthesizer: "gemini35",
+      frontendSynthesis: true,
+      tests: TESTS.map(function (t) { return { id:t.id, stack:t.stack, policy:"optional", selected:true, lose:t.lose, locked:false }; }),
+      tools: { playwright:true, docker:true, mistral:true },
+      gates: { A:true, B:true, C:true, D:true, E:true }
+    };
+  }
+
+  function byId(id) { return document.getElementById(id); }
+  function step(id) { return state.steps.find(function (s) { return s.id === id; }); }
+  function activeSteps() { return state.steps.filter(function (s) { return s.selected; }); }
+  function delegateCount() { return MODEL_IDS.reduce(function (n, m) { return n + (state.delegateModels[m] ? 1 : 0); }, 0); }
+
+  function autolayout() {
+    state.steps.forEach(function (s, i) {
+      var row = Math.floor(i / 6);
+      s.pos = { x: MARGIN + (i % 6) * COL_GAP, y: MARGIN + row * ROW_GAP };
+    });
+  }
+
+  autolayout();
+
+  function pushHistory() {
+    history.push(JSON.stringify(state));
+    if (history.length > 50) history.shift();
+    redoStack.length = 0;
+    updateActionState();
+  }
+
+  function undo() {
+    if (!history.length) return;
+    redoStack.push(JSON.stringify(state));
+    state = JSON.parse(history.pop());
+    if (selected && !step(selected)) selected = null;
+    render();
+    updateActionState();
+  }
+
+  function redo() {
+    if (!redoStack.length) return;
+    history.push(JSON.stringify(state));
+    state = JSON.parse(redoStack.pop());
+    render();
+    updateActionState();
+  }
+
+  function updateActionState() {
+    byId("btnUndo").disabled = history.length === 0;
+    byId("btnRedo").disabled = redoStack.length === 0;
+  }
+
+  function setStamp() {
+    var now = new Date().toISOString();
+    if (!state.createdAt) state.createdAt = now;
+    state.updatedAt = now;
+    byId("metaSpan").textContent = "created " + (state.createdAt || "-").slice(0,19).replace("T"," ") +
+      " · updated " + state.updatedAt.slice(0,19).replace("T"," ");
+  }
+
+  function showToast(msg) {
+    var t = byId("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2600);
+  }
+
+  function setCamera() {
+    var l = byId("layer");
+    l.style.transform = "translate(" + camera.vx + "px," + camera.vy + "px) scale(" + camera.k + ")";
+    renderMinimap();
+  }
+
+  function fitView() {
+    var ws = worldSize();
+    var wrap = byId("canvasWrap");
+    var w = wrap.clientWidth, h = wrap.clientHeight;
+    var k = Math.max(MIN_K, Math.min((w - 60) / ws.w, (h - 60) / ws.h, 1));
+    camera.k = k;
+    camera.vx = (w - ws.w * k) / 2;
+    camera.vy = (h - ws.h * k) / 2;
+    setCamera();
+  }
+
+  function worldSize() {
+    var maxX = 0, maxY = 0;
+    state.steps.forEach(function (s) {
+      maxX = Math.max(maxX, s.pos.x + NODE_W);
+      maxY = Math.max(maxY, s.pos.y + NODE_H);
+    });
+    return { w: Math.max(maxX + MARGIN, 600), h: Math.max(maxY + MARGIN, 400) };
+  }
+
+  function zoomAt(mx, my, factor) {
+    var nk = Math.min(MAX_K, Math.max(MIN_K, camera.k * factor));
+    var wx = (mx - camera.vx) / camera.k;
+    var wy = (my - camera.vy) / camera.k;
+    camera.k = nk;
+    camera.vx = mx - wx * nk;
+    camera.vy = my - wy * nk;
+    setCamera();
+  }
+
+  function renderNodes() {
+    var box = byId("nodes");
+    box.innerHTML = "";
+    state.steps.forEach(function (s) {
+      var el = document.createElement("div");
+      el.className = "node";
+      if (!s.selected) el.classList.add("off");
+      if (s.policy === "required") el.classList.add("locked");
+      if (selected === s.id) el.classList.add("selected");
+      el.setAttribute("data-id", s.id);
+      el.style.left = s.pos.x + "px";
+      el.style.top = s.pos.y + "px";
+      var head = '<div class="n-head"><span class="n-id">' + s.id + '</span><span class="n-name">' + s.name + '</span>';
+      if (s.policy === "required") {
+        head += '<span class="power" title="Locked by policy" style="background:var(--warn);border-color:var(--warn);color:#1a1205;cursor:default">🔒</span>';
+      } else {
+        head += '<button class="power ' + (s.selected ? "on" : "off") + '" data-power="' + s.id + '" title="' + (s.selected ? "Disable step" : "Enable step") + '">⏻</button>';
+      }
+      head += '</div>';
+      var badge = s.policy === "required" ? '<span class="n-badge">Locked by policy</span>' : "";
+      el.innerHTML = head + '<div class="n-lose">' + s.lose + '</div>' + badge;
+      box.appendChild(el);
+    });
+    box.querySelectorAll("[data-power]").forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        toggleStep(Number(b.getAttribute("data-power")));
+      });
+    });
+    renderEdges();
+  }
+
+  function edgePath(s, t) {
+    var sx = s.pos.x + NODE_W, sy = s.pos.y + NODE_H / 2;
+    var tx = t.pos.x, ty = t.pos.y + NODE_H / 2;
+    var dx = Math.max(36, (tx - sx) / 2);
+    return "M" + sx + "," + sy + " C" + (sx + dx) + "," + sy + "," + (tx - dx) + "," + ty + "," + tx + "," + ty;
+  }
+
+  function renderEdges() {
+    var svg = byId("edgeSvg");
+    var enabled = activeSteps();
+    var parts = [];
+    for (var i = 0; i < enabled.length - 1; i++) {
+      var s = enabled[i], t = enabled[i + 1];
+      parts.push('<path class="edge-path" d="' + edgePath(s, t) + '" marker-end="url(#arr)"/>');
+    }
+    var all = state.steps;
+    for (var j = 0; j < all.length - 1; j++) {
+      if (all[j].selected && all[j + 1].selected) continue;
+      parts.push('<path class="edge-skip" d="' + edgePath(all[j], all[j + 1]) + '"/>');
+    }
+    parts.push('<defs><marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 Z" fill="' + getCss("--acc") + '"/></marker></defs>');
+    svg.innerHTML = parts.join("");
+  }
+
+  function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#4f8cff"; }
+
+  function renderMinimap() {
+    var mm = byId("minimap");
+    var ws = worldSize();
+    var mw = 170, mh = 110;
+    var scale = Math.min(mw / ws.w, mh / ws.h, 0.3);
+    mm.innerHTML = "";
+    var wrap = byId("canvasWrap");
+    state.steps.forEach(function (s) {
+      var r = document.createElement("div");
+      r.className = "mm-node" + (s.selected ? "" : " off") + (s.policy === "required" ? " locked" : "");
+      var x = s.pos.x * scale, y = s.pos.y * scale;
+      r.style.left = x + "px"; r.style.top = y + "px";
+      r.style.width = Math.max(4, NODE_W * scale) + "px";
+      r.style.height = Math.max(4, NODE_H * scale) + "px";
+      mm.appendChild(r);
+    });
+    var vp = document.createElement("div");
+    vp.className = "mm-vp";
+    vp.style.left = (-camera.vx / camera.k) * scale + "px";
+    vp.style.top = (-camera.vy / camera.k) * scale + "px";
+    vp.style.width = (wrap.clientWidth / camera.k) * scale + "px";
+    vp.style.height = (wrap.clientHeight / camera.k) * scale + "px";
+    mm.appendChild(vp);
+  }
+
+  function renderStepList() {
+    var list = byId("stepList");
+    list.innerHTML = "";
+    state.steps.forEach(function (s) {
+      var c = document.createElement("div");
+      c.className = "chip" + (s.selected ? "" : " off");
+      c.innerHTML = '<span class="nid">' + s.id + '</span>' + s.name +
+        (s.policy === "required" ? '<span class="lock">🔒</span>' : (s.selected ? '<span style="margin-left:auto;color:var(--ok)">●</span>' : '<span style="margin-left:auto;color:var(--dim)">○</span>'));
+      c.addEventListener("click", function () { selectNode(s.id); });
+      list.appendChild(c);
+    });
+  }
+
+  function renderChecks() {
+    var m = byId("modelChecks"); m.innerHTML = "";
+    MODEL_IDS.forEach(function (id) {
+      var label = document.createElement("label");
+      label.className = "check";
+      var cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = state.delegateModels[id];
+      cb.addEventListener("change", function () { pushHistory(); state.delegateModels[id] = cb.checked; render(); });
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(id));
+      var span = document.createElement("span");
+      span.className = "role"; span.textContent = state.roles[id];
+      label.appendChild(span);
+      m.appendChild(label);
+    });
+
+    var t = byId("testChecks"); t.innerHTML = "";
+    state.tests.forEach(function (te) {
+      if (stackFilter !== "all" && te.stack !== stackFilter) return;
+      var label = document.createElement("label");
+      label.className = "check";
+      var cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = te.selected; cb.disabled = te.locked;
+      cb.addEventListener("change", function () { pushHistory(); te.selected = cb.checked; render(); });
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(te.id));
+      if (te.locked) label.appendChild(document.createTextNode(" 🔒"));
+      t.appendChild(label);
+    });
+
+    var tl = byId("toolChecks"); tl.innerHTML = "";
+    TOOL_DEFS.forEach(function (td) {
+      var label = document.createElement("label");
+      label.className = "check";
+      var cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = state.tools[td.id];
+      cb.addEventListener("change", function () { pushHistory(); state.tools[td.id] = cb.checked; render(); });
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(td.id));
+      tl.appendChild(label);
+    });
+
+    var g = byId("gateChecks"); g.innerHTML = "";
+    GATE_DEFS.forEach(function (gid) {
+      var label = document.createElement("label");
+      label.className = "check";
+      var cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = state.gates[gid];
+      cb.addEventListener("change", function () { pushHistory(); state.gates[gid] = cb.checked; render(); });
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode("Gate " + gid));
+      g.appendChild(label);
+    });
+
+    byId("frontendSynth").checked = state.frontendSynthesis;
+    byId("synthSelect").value = state.synthesizer;
+    byId("nameInput").value = state.name;
+  }
+
+  function selectNode(id) {
+    selected = id;
+    render();
+  }
+
+  function renderInspector() {
+    var box = byId("inspBody");
+    if (selected === null || !step(selected)) {
+      box.innerHTML = '<div class="hint">Select a step on the canvas to configure it.</div>';
+      return;
+    }
+    var s = step(selected);
+    var related = GATE_DEFS.filter(function (g) { return state.gates[g]; });
+    var html = '<h3>' + s.id + '. ' + s.name + '</h3>';
+    html += '<div class="kv"><span class="k">Policy</span><span>' + s.policy + '</span></div>';
+    html += '<div class="kv"><span class="k">State</span><span style="color:' + (s.selected ? "var(--ok)" : "var(--bad)") + '">' + (s.selected ? "ON" : "OFF") + '</span></div>';
+    html += '<div class="kv"><span class="k">You lose if off</span><span>' + s.lose + '</span></div>';
+    html += '<div class="kv"><span class="k">Linked gates</span><span>' + related.join(" ") + '</span></div>';
+    html += '<div class="pill ' + (s.selected ? "on" : "off") + '">' + (s.selected ? "in pipeline" : "skipped by edges") + '</div>';
+    box.innerHTML = html;
+    var acts = document.createElement("div");
+    acts.className = "insp-actions";
+    if (s.policy !== "required") {
+      var tog = document.createElement("button");
+      tog.className = "btn";
+      tog.textContent = s.selected ? "Disable" : "Enable";
+      tog.addEventListener("click", function () { toggleStep(s.id); });
+      acts.appendChild(tog);
+    }
+    var up = document.createElement("button"); up.className = "btn"; up.textContent = "↑ Move up";
+    up.addEventListener("click", function () { moveStep(s.id, -1); });
+    acts.appendChild(up);
+    var dn = document.createElement("button"); dn.className = "btn"; dn.textContent = "↓ Move down";
+    dn.addEventListener("click", function () { moveStep(s.id, 1); });
+    acts.appendChild(dn);
+    var fc = document.createElement("button"); fc.className = "btn"; fc.textContent = "Focus";
+    fc.addEventListener("click", function () { focusNode(s.id); });
+    acts.appendChild(fc);
+    box.appendChild(acts);
+  }
+
+  function toggleStep(id) {
+    var s = step(id);
+    if (!s || s.policy === "required") return;
+    pushHistory();
+    s.selected = !s.selected;
+    render();
+    showToast(s.selected ? s.name + " added to the run" : s.name + " removed from the run");
+  }
+
+  function moveStep(id, dir) {
+    var i = state.steps.findIndex(function (x) { return x.id === id; });
+    var j = i + dir;
+    if (j < 0 || j >= state.steps.length) return;
+    pushHistory();
+    var tmp = state.steps[i];
+    state.steps[i] = state.steps[j];
+    state.steps[j] = tmp;
+    render();
+  }
+
+  function focusNode(id) {
+    var s = step(id);
+    var wrap = byId("canvasWrap");
+    camera.vx = wrap.clientWidth / 2 - (s.pos.x + NODE_W / 2) * camera.k;
+    camera.vy = wrap.clientHeight / 2 - (s.pos.y + NODE_H / 2) * camera.k;
+    setCamera();
+    renderMinimap();
+  }
+
+  function renderBottom() {
+    var chips = byId("lossChips");
+    chips.innerHTML = "";
+    var items = [];
+    state.steps.forEach(function (s) { if (!s.selected && s.policy !== "required") items.push({ id: s.id, label: s.name + " — " + s.lose }); });
+    state.tests.forEach(function (t) { if (!t.selected) items.push({ id: null, label: t.id + ": " + t.lose }); });
+    TOOL_DEFS.forEach(function (td) { if (!state.tools[td.id]) items.push({ id: null, label: td.id + ": " + td.lose }); });
+    GATE_DEFS.forEach(function (gid) { if (!state.gates[gid]) items.push({ id: null, label: "Gate " + gid + ": required gates off ⇒ INCOMPLETE_REVIEW" }); });
+    if (!state.frontendSynthesis) items.push({ id: null, label: "Frontend synthesis: design-plan + visual-gate PASS evidence lost" });
+    if (!items.length) {
+      var ok = document.createElement("span");
+      ok.style.cssText = "color:var(--ok);font-size:12px";
+      ok.textContent = "nothing — full set on";
+      chips.appendChild(ok);
+    }
+    items.forEach(function (it) {
+      var c = document.createElement("span");
+      c.className = "loss-chip";
+      c.innerHTML = '<span class="x">✕</span> ' + it.label;
+      if (it.id !== null) c.addEventListener("click", function () { selectNode(it.id); focusNode(it.id); });
+      chips.appendChild(c);
+    });
+    byId("delegateNote").textContent = delegateCount() >= 2
+      ? "Delegate auto-included (" + delegateCount() + " models)"
+      : "Delegate auto-off (≤1 model)";
+  }
+
+  function renderExport() {
+    var json = JSON.stringify(state, null, 2);
+    byId("jsonOut").value = json;
+    byId("svgOut").value = renderSVG();
+    window.__flowResult = Object.assign({}, state, { svg: renderSVG(), json: json });
+  }
+
+  function renderSVG() {
+    var ws = worldSize();
+    var parts = [];
+    parts.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + ws.w + '" height="' + ws.h + '">');
+    parts.push('<rect width="100%" height="100%" fill="' + getCss("--bg") + '"/>');
+    var enabled = activeSteps();
+    for (var i = 0; i < enabled.length - 1; i++) {
+      parts.push('<path d="' + edgePath(enabled[i], enabled[i + 1]) + '" stroke="' + getCss("--acc") + '" stroke-width="2" fill="none" marker-end="url(#arrs)"/>');
+    }
+    parts.push('<defs><marker id="arrs" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 Z" fill="' + getCss("--acc") + '"/></marker></defs>');
+    state.steps.forEach(function (s) {
+      var col = s.policy === "required" ? getCss("--warn") : (s.selected ? getCss("--acc") : getCss("--dim"));
+      var fill = s.selected ? "rgba(16,19,26,0.9)" : "rgba(16,19,26,0.4)";
+      parts.push('<rect x="' + s.pos.x + '" y="' + s.pos.y + '" width="' + NODE_W + '" height="' + NODE_H + '" rx="10" fill="' + fill + '" stroke="' + col + '" stroke-width="1.5"/>');
+      parts.push('<text x="' + (s.pos.x + 10) + '" y="' + (s.pos.y + 20) + '" fill="' + getCss("--text") + '" font-size="12" font-family="Segoe UI">' + s.id + '. ' + s.name + '</text>');
+      parts.push('<text x="' + (s.pos.x + 10) + '" y="' + (s.pos.y + 40) + '" fill="' + getCss("--dim") + '" font-size="9" font-family="Segoe UI">' + s.lose + '</text>');
+    });
+    parts.push('</svg>');
+    return parts.join("");
+  }
+
+  function render() {
+    renderNodes();
+    renderStepList();
+    renderChecks();
+    renderInspector();
+    renderBottom();
+    renderExport();
+    setCamera();
+  }
+
+  function applyPreset(p) {
+    pushHistory();
+    var base = makeDefaultState();
+    state.delegateModels = base.delegateModels;
+    state.tools = base.tools;
+    state.gates = base.gates;
+    state.synthesizer = base.synthesizer;
+    state.frontendSynthesis = base.frontendSynthesis;
+    state.steps = base.steps;
+    if (p === "minimal") {
+      state.steps.forEach(function (s) { if (s.policy !== "required") s.selected = false; });
+      state.tests = base.tests.map(function (t) { return t.id === "pytest-functional" ? t : Object.assign({}, t, { selected: false }); });
+    } else if (p === "security") {
+      state.tests = base.tests.map(function (t) { return t; });
+      state.tools = { playwright:true, docker:true, mistral:true };
+      state.gates = { A:true, B:true, C:true, D:true, E:true };
+    } else {
+      state.tests = base.tests;
+    }
+    autolayout();
+    pushHistory();
+    render();
+    showToast("Preset loaded: " + p);
+  }
+
+  function wireUI() {
+    byId("nameInput").addEventListener("input", function () { state.name = this.value; renderExport(); });
+    byId("frontendSynth").addEventListener("change", function () { pushHistory(); state.frontendSynthesis = this.checked; render(); });
+    byId("synthSelect").addEventListener("change", function () { pushHistory(); state.synthesizer = this.value; render(); });
+    byId("stackSelect").addEventListener("change", function () { stackFilter = this.value; renderChecks(); });
+    byId("btnUndo").addEventListener("click", undo);
+    byId("btnRedo").addEventListener("click", redo);
+    byId("btnReset").addEventListener("click", function () {
+      state = makeDefaultState();
+      state.name = "";
+      autolayout();
+      selected = null;
+      history = []; redoStack = [];
+      byId("nameInput").value = "";
+      render();
+      updateActionState();
+      showToast("Reset to default flow");
+    });
+    byId("btnSave").addEventListener("click", function () { setStamp(); renderExport(); showToast("Flow ready — read window.__flowResult via Playwright"); });
+    byId("presetSelect").addEventListener("change", function () { applyPreset(this.value); this.selectedIndex = 0; });
+
+    byId("zIn").addEventListener("click", function () { var w = byId("canvasWrap"); zoomAt(w.clientWidth/2, w.clientHeight/2, 1.2); });
+    byId("zOut").addEventListener("click", function () { var w = byId("canvasWrap"); zoomAt(w.clientWidth/2, w.clientHeight/2, 1/1.2); });
+    byId("zOne").addEventListener("click", function () { camera.k = 1; setCamera(); });
+    byId("zFit").addEventListener("click", fitView);
+    byId("zLayout").addEventListener("click", function () { autolayout(); pushHistory(); render(); showToast("Auto-layout applied"); });
+
+    byId("exportToggle").addEventListener("click", function () {
+      var open = byId("exportBody").classList.toggle("open");
+      this.classList.toggle("active", open);
+      this.textContent = open ? "▾ Export (SVG · JSON)" : "▸ Export (SVG · JSON)";
+    });
+
+    document.querySelectorAll(".tab").forEach(function (t) {
+      t.addEventListener("click", function () {
+        document.querySelectorAll(".tab").forEach(function (x) { x.classList.remove("active"); });
+        t.classList.add("active");
+        byId("pane-steps").classList.toggle("hidden", t.getAttribute("data-tab") !== "steps");
+        byId("pane-config").classList.toggle("hidden", t.getAttribute("data-tab") !== "config");
+      });
+    });
+
+    wireCanvas();
+  }
+
+  function wireCanvas() {
+    var wrap = byId("canvasWrap");
+    var layer = byId("layer");
+    var nodesBox = byId("nodes");
+
+    wrap.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      if (e.shiftKey) {
+        camera.vx -= e.deltaY;
+        setCamera();
+      } else {
+        zoomAt(e.clientX - wrap.getBoundingClientRect().left, e.clientY - wrap.getBoundingClientRect().top, e.deltaY < 0 ? 1.1 : 0.9);
+      }
+    }, { passive:false });
+
+    var pan = null;
+    var drag = null;
+
+    wrap.addEventListener("pointerdown", function (e) {
+      var t = e.target;
+      var nodeEl = t.closest ? t.closest(".node") : null;
+      if (nodeEl) {
+        if (e.button !== 0) return;
+        if (t.closest && t.closest(".power")) return;
+        drag = {
+          id: Number(nodeEl.getAttribute("data-id")),
+          px: e.clientX, py: e.clientY,
+          ox: step(Number(nodeEl.getAttribute("data-id"))).pos.x,
+          oy: step(Number(nodeEl.getAttribute("data-id"))).pos.y,
+          moved: false,
+          before: JSON.stringify(state)
+        };
+        nodeEl.setPointerCapture(e.pointerId);
+        if (selected !== drag.id) {
+          selected = drag.id;
+          document.querySelectorAll(".node.selected").forEach(function (el) { el.classList.remove("selected"); });
+          nodeEl.classList.add("selected");
+          renderStepList();
+          renderInspector();
+        }
+        e.preventDefault();
+      } else if ((e.button === 1 || e.button === 0) && !(t.closest && t.closest("#zoomBar,#minimap,#toast"))) {
+        pan = { px: e.clientX, py: e.clientY, vx: camera.vx, vy: camera.vy };
+        wrap.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      }
+    });
+
+    wrap.addEventListener("pointermove", function (e) {
+      if (drag) {
+        var s = step(drag.id);
+        var nx = drag.ox + (e.clientX - drag.px) / camera.k;
+        var ny = drag.oy + (e.clientY - drag.py) / camera.k;
+        nx = Math.round(nx / GRID) * GRID;
+        ny = Math.round(ny / GRID) * GRID;
+        if (Math.abs(nx - s.pos.x) > 0 || Math.abs(ny - s.pos.y) > 0) drag.moved = true;
+        s.pos.x = nx; s.pos.y = ny;
+        renderNodes();
+        renderMinimap();
+        renderExport();
+      } else if (pan) {
+        camera.vx = pan.vx + (e.clientX - pan.px);
+        camera.vy = pan.vy + (e.clientY - pan.py);
+        setCamera();
+      }
+    });
+
+    function endDrag(e) {
+      if (drag) {
+        var over = document.elementFromPoint(e.clientX, e.clientY);
+        var overEl = over ? over.closest ? over.closest(".node") : null : null;
+        if (overEl && Number(overEl.getAttribute("data-id")) !== drag.id) {
+          reorderStep(drag.id, Number(overEl.getAttribute("data-id")));
+        } else if (drag.moved) {
+          history.push(drag.before);
+          if (history.length > 50) history.shift();
+          redoStack.length = 0;
+          render();
+          updateActionState();
+        } else {
+          render();
+        }
+        drag = null;
+      }
+      pan = null;
+    }
+
+    wrap.addEventListener("pointerup", endDrag);
+    wrap.addEventListener("pointercancel", function () { drag = null; pan = null; });
+
+    var mm = byId("minimap");
+    mm.addEventListener("pointerdown", function (e) {
+      var rect = mm.getBoundingClientRect();
+      var ws = worldSize();
+      var scale = Math.min(170 / ws.w, 110 / ws.h, 0.3);
+      var wx = (e.clientX - rect.left) / scale;
+      var wy = (e.clientY - rect.top) / scale;
+      camera.vx = rect.width / 2 - wx * camera.k;
+      camera.vy = rect.height / 2 - wy * camera.k;
+      setCamera();
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+        else if ((e.key === "z" && e.shiftKey) || e.key === "y") { e.preventDefault(); redo(); }
+        return;
+      }
+      if (selected === null) return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        var s = step(selected);
+        if (s && s.policy !== "required") { toggleStep(s.id); }
+      } else if (e.key === "Escape") {
+        selected = null; render();
+      } else if (e.key === "ArrowUp") { moveStep(selected, -1); }
+      else if (e.key === "ArrowDown") { moveStep(selected, 1); }
+    });
+  }
+
+  function reorderStep(id, beforeId) {
+    var from = state.steps.findIndex(function (x) { return x.id === id; });
+    var to = state.steps.findIndex(function (x) { return x.id === beforeId; });
+    if (from < 0 || to < 0 || from === to) return;
+    pushHistory();
+    var item = state.steps.splice(from, 1)[0];
+    state.steps.splice(to, 0, item);
+    render();
+    showToast(item.name + " reordered before " + state.steps[to].name);
+  }
+
+  window.__seedFlow = function (flow) {
+    if (!flow || typeof flow !== "object") return false;
+    state = JSON.parse(JSON.stringify(flow));
+    var loseMap = {};
+    STEP_DEFS.forEach(function (d) { loseMap[d.id] = d.lose; });
+    STEP_DEFS.forEach(function (def) {
+      var s = state.steps.find(function (x) { return x.id === def.id; });
+      if (s) {
+        if (s.lose === undefined || s.lose === null) s.lose = def.lose;
+      } else {
+        state.steps.push({ id: def.id, name: def.name, policy: def.policy, selected: false, lose: def.lose, pos: { x: 0, y: 0 } });
+      }
+    });
+    var testLose = {};
+    TESTS.forEach(function (t) { testLose[t.id] = t.lose; });
+    state.tests.forEach(function (t) { if (t.lose === undefined || t.lose === null) t.lose = testLose[t.id] || ""; });
+    var missing = state.steps.some(function (s) { return !s.pos; });
+    if (missing) autolayout();
+    state.steps = state.steps.slice().sort(function (a, b) { return a.id - b.id; });
+    selected = null;
+    history = []; redoStack = [];
+    byId("nameInput").value = state.name || "";
+    if (!state.schema_version) state.schema_version = 1;
+    if (!state.flow_version) state.flow_version = 1;
+    render();
+    updateActionState();
+    return true;
+  };
+
+  window.__detectStack = function (id) {
+    stackFilter = id || "all";
+    byId("stackSelect").value = stackFilter;
+    renderChecks();
+    return stackFilter;
+  };
+
+  setStamp();
+  wireUI();
+  render();
+  updateActionState();
+  showToast("Click a step's power icon to toggle it · drag a node to reorder · drag empty canvas to pan · scroll to zoom");
+})();
+</script>
+</body>
+</html>

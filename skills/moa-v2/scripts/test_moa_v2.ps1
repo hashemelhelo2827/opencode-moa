@@ -152,7 +152,7 @@ if ($Unit -or $All) {
 # ---------------------------------------------------------------
 if ($Unit -or $All) {
     Write-Host "`n=== Skills & Memory ===" -ForegroundColor Cyan
-    foreach ($skill in @('prompt-optimizer', 'decompose-plan', 'skill-finder-stacker', 'test-script-maker')) {
+    foreach ($skill in @('prompt-optimizer', 'decompose-plan', 'skill-finder-stacker', 'test-script-maker', 'grill-me')) {
         Test-Step "$skill SKILL.md exists" {
             $p = Join-Path $skillRoot "$skill\SKILL.md"
             if (-not (Test-Path $p)) { throw "missing $skill\SKILL.md" }
@@ -168,10 +168,21 @@ if ($Unit -or $All) {
         }
     }
 
+    Test-Step "Workflow Authority + catalogs in MOA_V2_MEMORY.md" {
+        $p = Join-Path $skillRoot "MOA_V2_MEMORY.md"
+        $c = Get-Content $p -Raw
+        foreach ($sec in @('Workflow Authority', 'Test Catalog', 'Tool Registry')) {
+            if ($c -notmatch [regex]::Escape("## $sec")) { throw "missing section: $sec" }
+        }
+        foreach ($key in @('enabled', 'flow_menu_mode', 'per_session_override', 'grill_me')) {
+            if ($c -notmatch $key) { throw "missing key: $key" }
+        }
+    }
+
     Test-Step "counters named per spec" {
         $p = Join-Path $skillRoot "MOA_V2_MEMORY.md"
         $c = Get-Content $p -Raw
-        foreach ($counter in @('mistral_lo_calls_today', 'mistral_hi_calls_today', 'gemini35_calls_today', 'gemini3_calls_today', 'deepseek_synthesis_calls_today')) {
+        foreach ($counter in @('mistral_lo_calls_today', 'mistral_hi_calls_today', 'gemini35_calls_today', 'gemini3_calls_today', 'deepseek_synthesis_calls_today', 'grill_fact_calls_today')) {
             if ($c -notmatch $counter) { throw "missing counter: $counter" }
         }
     }
@@ -202,13 +213,26 @@ if ($Unit -or $All) {
         if (-not (Test-Path $df)) { throw "missing sandbox\Dockerfile" }
     }
 
+    Test-Step "flow_menu.html exists" {
+        $f = Join-Path $scriptDir "flow_menu.html"
+        if (-not (Test-Path $f)) { throw "missing flow_menu.html" }
+        if ((Get-Item $f).Length -eq 0) { throw "flow_menu.html is empty" }
+    }
+
     Test-Step "pytest test files exist for all scripts" {
         $testsDir = Join-Path $scriptDir "tests"
         if (-not (Test-Path $testsDir)) { throw "no tests dir" }
-        $expect = @('test_verdict_engine.py', 'test_build_review_package.py', 'test_classify_complexity.py', 'test_mutate_workspace.py', 'test_benchmark_reviewer.py', 'test_sandbox_run.py')
+        $expect = @('test_verdict_engine.py', 'test_build_review_package.py', 'test_classify_complexity.py', 'test_mutate_workspace.py', 'test_benchmark_reviewer.py', 'test_sandbox_run.py', 'test_validate_flow.py')
         foreach ($t in $expect) {
             if (-not (Test-Path (Join-Path $testsDir $t))) { throw "missing $t" }
         }
+    }
+
+    Test-Step "validate_flow.py + test_validate_flow.py exist" {
+        $v = Join-Path $scriptDir "validate_flow.py"
+        $t = Join-Path $scriptDir "tests\test_validate_flow.py"
+        if (-not (Test-Path $v)) { throw "missing validate_flow.py" }
+        if (-not (Test-Path $t)) { throw "missing test_validate_flow.py" }
     }
 
     Test-Step "pytest installed" {

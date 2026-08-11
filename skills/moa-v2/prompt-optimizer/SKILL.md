@@ -9,7 +9,7 @@ Convert the user's request into an execution brief WITHOUT altering their words.
 
 ## Rules
 
-- **Preserve the original user text verbatim.** Store it in its own section (`## Original Request`) in `01-brief.md`. Never paraphrase it away.
+- **Preserve the original user text verbatim.** Store it in its own section (`## Original Request`) in `02-brief.md`. Never paraphrase it away.
 - Derive a `task_type`: `web | app | analysis | data | infra | mixed`.
 - Set `needs_frontend_synthesis`: `true` if any part of the deliverable involves UI / frontend / visual work, else `false`.
 - Implicit and explicit requirements are both candidates for criteria. Nothing the user says should silently disappear.
@@ -17,7 +17,7 @@ Convert the user's request into an execution brief WITHOUT altering their words.
 
 ## Output
 
-Write `01-brief.md` in `.moa-v2/traces/<run-id>/` with:
+Write `02-brief.md` in `.moa-v2/traces/<run-id>/` with:
 
 ```
 ## Original User

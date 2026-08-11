@@ -8,31 +8,45 @@ An **evidence-based build pipeline** for [opencode](https://opencode.ai). moa-v2
 
 ```mermaid
 flowchart TD
-    A["User brief (original text preserved)"] --> B["1. Optimize (prompt-optimizer)
+    A["User brief (original text preserved)"] --> B["0. Grill-me
+        design-tree interview (6 rounds / 25 Q cap)"]
+    B --> C["1. Optimize (prompt-optimizer)
         tag task_type + needs_frontend_synthesis"]
-    B --> C["2. Plan (decompose-plan)
+    C --> D["2. Plan (decompose-plan)
         tasks + measurable criteria blocking/major/minor"]
-    C --> D["3. Skills (skill-finder-stacker)
+    D --> E["3. Skills (skill-finder-stacker)
         discover + vet candidates (UNTRUSTED)"]
-    D -- "rejections" --> P["pause checkpoint"]
-    P --> E
-    D -- "no rejections" --> E
-    E["4. Delegate 5 agents in parallel
-        DeepSeek Nemotron North Mimo BigPickle"] --> F["5a. Plan (Gemini 3.5 → 3 → DeepSeek)
+    E -- "rejections" --> P["pause checkpoint"]
+    P --> F
+    E -- "no rejections" --> F
+    F["4. Delegate 5 agents in parallel
+        DeepSeek Nemotron North Mimo BigPickle"] --> G["5a. Plan (Gemini 3.5 → 3 → DeepSeek)
         frontend design plan only"]
-    F --> G["5b. Implement (DeepSeek, unlimited)
+    G --> H["5b. Implement (DeepSeek, unlimited)
         writes files to working tree"]
-    G --> H["6. Test (test-script-maker)
+    H --> I["6. Test (test-script-maker)
         pytest / node:test / DOM, in Docker sandbox"]
-    H --> I["7. Review: 5 gates
+    I --> J["7. Review: 5 gates
         A semantic | B static (Mistral lo/hi)
         C Docker runtime | D adversarial | E verdict (Python)"]
-    I --> J["Visual gate (Playwright, frontend only)"]
-    J --> K{"Verdict engine (Python)"}
-    K -- "PASS" --> L["Done"]
-    K -- "FAIL" --> M["fix → re-run full suite"]
-    M --> H
+    J --> K["Visual gate (Playwright, frontend only)"]
+    K --> L{"Verdict engine (Python)"}
+    L -- "PASS" --> M["Done"]
+    L -- "FAIL" --> N["fix → re-run full suite"]
+    N --> I
 ```
+
+## Workflow Authority (user-selectable flow)
+
+Flow = execution preference. Policy = immutable requirement. Flow drops execution, never a requirement.
+
+At run start the orchestrator either shows the **flow menu** (Mode 1 flowchart via Playwright, or Mode 2 terminal picker) or auto-proceeds with the default full set. A project-flow auto-detect always runs: if `<project>/.moa-v2/workflow/flow.json` exists, the user is asked whether to reuse it (with a staleness warning via `project_revision_at_creation`).
+
+- **Five toggle panels** — Steps (0–7), Models, Tests, Tools, Gates. Every row is a toggle with a "you lose if off" line. Policy-required items are forced `selected:true + locked:true` and shown as "Locked by policy"; user-declared contradictions (`policy:"required"` + `selected:false`) are **REJECTED**.
+- **Gate IDs are always A–E.** B-light/D-light are `gate_profiles` (depth floors), never gate IDs.
+- **Saved-flow picker** — global saved flows in `skills/moa-v2/saved-flows/*.json` (timestamps stored inside the file, never in the filename), with SVG preview + `window.__seedFlow` hydration.
+
+Policy is enforced by `classify_complexity.py` (emits `required_gates` / `gate_profiles` / `required_tests` / `required_tools`) and `validate_flow.py` (the only browser→run gate; schema REJECT vs policy normalize+lock). The orchestrator builds the review package with `gates_required = policy.required_gates` — NEVER from `00-flow.md`.
 
 ## Team
 
@@ -67,7 +81,7 @@ For **frontend / complex** tasks a **visual gate** runs via Playwright MCP: scre
 - [opencode](https://opencode.ai)
 - Python 3.14+ (for the verdict engine, unit tests, and sandbox runner)
 - Docker Desktop with WSL2 backend (Gate C + mutation isolation)
-- Playwright browsers (visual gate): `npx playwright install`
+- Playwright browsers (visual gate + flow menu): `npx playwright install`
 
 ## Install
 
@@ -83,7 +97,7 @@ For **frontend / complex** tasks a **visual gate** runs via Playwright MCP: scre
    Copy-Item -Recurse skills\moa-v2 ~\.config\opencode\skills\
    ```
 
-3. **Merge the config** — take `config/opencode.jsonc.example` and merge the `provider.mistral` block plus the `moa-*` agent definitions into your existing `opencode.jsonc`.
+3. **Merge the config** — take `config/opencode.jsonc.example` and merge the `mcp.playwright` block, the `provider.mistral` block, and the `moa-*` agent definitions into your existing `opencode.jsonc`.
 
 4. **API keys** (all via env vars — no literals in the repo):
 
@@ -98,7 +112,7 @@ For **frontend / complex** tasks a **visual gate** runs via Playwright MCP: scre
 
 ## Usage
 
-Invoke the `@moa-v2` agent with your brief. Auto-mode is the default (states assumptions and proceeds); interactive checkpoints exist for skill rejections, destructive commands, out-of-reach complexity, and context pressure.
+Invoke the `@moa-v2` agent with your brief. Auto-mode is the default (states assumptions and proceeds); interactive checkpoints exist for the Step 0 grill-me interview (when `grill_me: true`), skill rejections, destructive commands, out-of-reach complexity, and context pressure. `grill_me: false` skips the interview only — it does not make a run fully automated.
 
 ## Rate limits & quota
 
@@ -110,9 +124,9 @@ Invoke the `@moa-v2` agent with your brief. Auto-mode is the default (states ass
 
 ```powershell
 cd skills\moa-v2\scripts
-powershell -File .\test_moa_v2.ps1        # Gate 1
+powershell -File .\test_moa_v2.ps1        # Gate 1 harness (97 checks)
 powershell -File .\gate2_dry_run.ps1      # Gate 2 (providers + Docker)
-python -m pytest -q                        # unit tests (61 tests)
+python -m pytest tests -q                 # unit tests (81 tests)
 ```
 
 ## Layout
@@ -120,18 +134,21 @@ python -m pytest -q                        # unit tests (61 tests)
 ```
 agents/                      9 agent definitions (moa-v2 + team)
 skills/moa-v2/               skill family
+  grill-me/                  Step 0 — design-tree interview
   prompt-optimizer/          Step 1 — brief + task_type tags
   decompose-plan/            Step 2 — tasks + measurable criteria
   skill-finder-stacker/      Step 3 — skill discovery + vetting
   test-script-maker/         Step 6 — test matrix + scripts
   scripts/                   root-of-trust Python + PS1 scripts
+    flow_menu.html           flowchart editor (Mode 1) + SVG/JSON export
+    validate_flow.py         browser→run gate: schema REJECT / policy normalize
+    classify_complexity.py   complexity scaling + policy requirement sets
     verdict_engine.py        authoritative verdict (no LLM)
     build_review_package.py  build the typed review package
-    classify_complexity.py   complexity scaling
     mutate_workspace.py      COW mutation tests
     benchmark_reviewer.py    fallback-reviewer benchmark
     sandbox/                 Docker sandbox (Gate C)
-  MOA_V2_MEMORY.md           budget counters + benchmark table
+  MOA_V2_MEMORY.md           budget counters + catalogs + workflow authority
   LESSONS.md                 append-only lessons
-config/opencode.jsonc.example  trimmed provider + agent config
+config/opencode.jsonc.example  trimmed provider + agent + Playwright MCP config
 ```

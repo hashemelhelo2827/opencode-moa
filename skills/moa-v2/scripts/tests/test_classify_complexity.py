@@ -69,3 +69,53 @@ def test_threshold_boundaries():
     assert classify(features={"ui", "auth"}, source_file_count=20)["tier"] == "standard"  # 5
     assert classify(features={"ui", "auth", "concurrency"})["tier"] == "complex"  # 6
     assert classify(features={"ui", "auth", "concurrency", "untrusted_input"})["tier"] == "complex"  # 8
+
+
+def test_trivial_required_policy():
+    r = classify(features=set(), source_file_count=2, runtime_count=1, has_db=False)
+    assert r["required_gates"] == ["A", "B", "D", "E"]
+    assert r["gate_profiles"] == {"B": "light", "D": "light"}
+    assert r["required_tests"] == ["pytest-functional"]
+    assert r["required_tools"] == []
+
+
+def test_standard_required_policy():
+    r = classify(features={"ui", "auth"}, source_file_count=2)
+    assert r["required_gates"] == ["A", "B", "C", "D", "E"]
+    assert r["gate_profiles"] == {}
+    assert "bandit-security" in r["required_tests"]
+    assert "docker" in r["required_tools"]
+
+
+def test_complex_required_policy():
+    r = classify(features={"ui", "auth", "untrusted_input", "external_api",
+                           "concurrency", "destructive_migration", "security_sensitive"},
+                 source_file_count=12, runtime_count=2, has_db=True)
+    assert r["required_gates"] == ["A", "B", "C", "D", "E"]
+    assert "mutation" in r["required_tests"]
+    assert "playwright" in r["required_tools"]
+
+
+def test_blocking_security_adds_bandit():
+    r = classify(features=set(), source_file_count=1, blocking_security=True)
+    assert r["tier"] == "standard"
+    assert "bandit-security" in r["required_tests"]
+
+
+def test_ui_adds_playwright():
+    r = classify(features={"ui"}, source_file_count=1)
+    assert "playwright-visual" in r["required_tests"]
+    assert "playwright" in r["required_tools"]
+
+
+def test_required_lists_are_copies():
+    r = classify(features=set(), source_file_count=1)
+    r["required_gates"].append("X")
+    r["required_tests"].append("X")
+    r["required_tools"].append("X")
+    r["gate_profiles"]["B"] = "full"
+    r2 = classify(features=set(), source_file_count=1)
+    assert "X" not in r2["required_gates"]
+    assert "X" not in r2["required_tests"]
+    assert "X" not in r2["required_tools"]
+    assert r2["gate_profiles"] == {"B": "light", "D": "light"}

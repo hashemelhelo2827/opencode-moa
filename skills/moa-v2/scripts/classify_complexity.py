@@ -41,6 +41,27 @@ SENSITIVE_SINGLE_FILE_KEYWORDS = {
     "jwt", "session", "upload", "sanitiz", "validate",
 }
 
+REQUIRED_GATES = {
+    "trivial":  ["A", "B", "D", "E"],          # gate IDs always A–E
+    "standard": ["A", "B", "C", "D", "E"],
+    "complex":  ["A", "B", "C", "D", "E"],
+}
+GATE_PROFILES = {
+    "trivial":  {"B": "light", "D": "light"},
+    "standard": {},
+    "complex":  {},
+}
+REQUIRED_TESTS = {
+    "trivial":  ["pytest-functional"],
+    "standard": ["pytest-functional", "bandit-security"],
+    "complex":  ["pytest-functional", "bandit-security", "mutation"],
+}
+REQUIRED_TOOLS = {
+    "trivial":  [],
+    "standard": ["docker"],
+    "complex":  ["docker", "playwright"],  # playwright only for frontend
+}
+
 
 def classify(
     *,
@@ -80,6 +101,17 @@ def classify(
         tier = "standard"
         reasons.append("single-file sensitive logic: forced >= standard")
 
+    required_gates = list(REQUIRED_GATES[tier])
+    gate_profiles = dict(GATE_PROFILES[tier])
+    required_tests = list(REQUIRED_TESTS[tier])
+    required_tools = list(REQUIRED_TOOLS[tier])
+    if blocking_security and "bandit-security" not in required_tests:
+        required_tests.append("bandit-security")
+    if "ui" in features and "playwright-visual" not in required_tests:
+        required_tests.append("playwright-visual")
+    if "ui" in features and "playwright" not in required_tools:
+        required_tools.append("playwright")
+
     return {
         "score": score,
         "tier": tier,
@@ -89,6 +121,10 @@ def classify(
         "runtime_count": runtime_count,
         "has_db": has_db,
         "blocking_security": blocking_security,
+        "required_gates": required_gates,
+        "gate_profiles": gate_profiles,
+        "required_tests": required_tests,
+        "required_tools": required_tools,
     }
 
 

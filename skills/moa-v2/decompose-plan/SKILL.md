@@ -20,7 +20,7 @@ Turn the brief (Step 1) into an executable plan and a measurable criteria list.
 
 ## Output
 
-Append to `01-brief.md` (or a `01-plan.md` sibling):
+Append to `02-brief.md` (or a `02-plan.md` sibling):
 
 ```
 ## Tasks

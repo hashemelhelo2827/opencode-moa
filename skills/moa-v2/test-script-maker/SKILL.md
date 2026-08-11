@@ -9,6 +9,8 @@ Produce verified, runnable tests bound to criteria.
 
 ## Test Matrix
 
+Source: MOA_V2_MEMORY.md → Test Catalog, filtered by the run's flow selection (00-flow.md).
+
 | Stack | Functional | Security signal |
 |---|---|---|
 | Python | pytest | bandit |
@@ -23,6 +25,9 @@ Produce verified, runnable tests bound to criteria.
 - Provide the exact command for each suite.
 - npm audit MUST run with `--offline`; if it cannot, record `NOT_RUN_OFFLINE` as the evidence state — never fabricate audit results.
 - Set fixed seeds where randomness is involved so runs are reproducible.
+- Tests are chosen from the vetted Test Catalog matching the run's stack AND `00-flow.md` test picks. Catalog tests are already vetted; anything discovered mid-run follows the quarantine stance (`04-vet-*`) before use.
+- Unselected catalog tests are NOT run; they are listed in `00-flow.md` with their loss line for Gate A transparency.
+- `MANIFEST.md` maps every chosen test → `criterion_id(s)` → stack.
 
 ## Output
 
