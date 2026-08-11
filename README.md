@@ -48,6 +48,21 @@ At run start the orchestrator either shows the **flow menu** (Mode 1 flowchart v
 
 Policy is enforced by `classify_complexity.py` (emits `required_gates` / `gate_profiles` / `required_tests` / `required_tools`) and `validate_flow.py` (the only browser→run gate; schema REJECT vs policy normalize+lock). The orchestrator builds the review package with `gates_required = policy.required_gates` — NEVER from `00-flow.md`.
 
+## Flow editor (`flow_menu.html`)
+
+Mode 1 opens the flowchart editor in the browser (Playwright). You edit the flow live on a canvas:
+
+- **Rename the flow** — editable name field in the header (timestamps are read-only, stored in the file).
+- **Toggle steps on/off** — the power (⏻) icon on each node enables/disables it. Optional steps toggle freely; `policy:required` steps show a 🔒 **Locked by policy** badge and cannot be turned off.
+- **Reorder steps** — drag a node onto another to insert it before it, or use the inspector **↑ Move up / ↓ Move down** buttons (also ArrowUp / ArrowDown keys).
+- **Undo / Redo** — `↶ Undo` (Ctrl+Z) and `↷ Redo` (Ctrl+Shift+Z) against a full history stack.
+- **Presets** — Full / Minimal / Security-hardened drop-down to apply a starting configuration.
+- **Configure everything** — sidebar checkboxes for delegate models, tests (filtered by stack), tools, and gates; a synthesizer picker; and a frontend-synthesis toggle.
+- **Canvas navigation** — pan by dragging empty space, zoom with scroll / `+` `−` / `1:1` / **Fit**, plus auto-layout and a minimap. Selecting a node opens an inspector with its policy, state, "you lose if off" line, and linked gates.
+- **Export** — live SVG and JSON textareas mirror the state (`window.__flowResult`).
+
+The editor's output is **untrusted** — every flow is validated by `validate_flow.py` before the run starts.
+
 ## Team
 
 | Agent | Model | Role |
@@ -140,7 +155,7 @@ skills/moa-v2/               skill family
   skill-finder-stacker/      Step 3 — skill discovery + vetting
   test-script-maker/         Step 6 — test matrix + scripts
   scripts/                   root-of-trust Python + PS1 scripts
-    flow_menu.html           flowchart editor (Mode 1) + SVG/JSON export
+    flow_menu.html           flowchart editor (Mode 1) — edit + SVG/JSON export
     validate_flow.py         browser→run gate: schema REJECT / policy normalize
     classify_complexity.py   complexity scaling + policy requirement sets
     verdict_engine.py        authoritative verdict (no LLM)
